@@ -1,0 +1,15 @@
+{
+  "name": "Spoonful: a to-do list that fits your energy",
+  "short_name": "Spoonful",
+  "description": "A gentle to-do list that shrinks to fit how much energy you have today.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#221f3e",
+  "theme_color": "#221f3e",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
