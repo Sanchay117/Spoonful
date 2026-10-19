@@ -32,6 +32,7 @@ const isTask = (t: unknown): t is Task =>
   typeof (t as Task).title === 'string' &&
   typeof (t as Task).createdAt === 'number' &&
   typeof (t as Task).scheduledFor === 'string' &&
+  ((t as Task).dueDate === undefined || typeof (t as Task).dueDate === 'string') &&
   ((t as Task).effort === 'light' || (t as Task).effort === 'medium' || (t as Task).effort === 'heavy');
 
 export const loadTasks = (): Task[] => {

@@ -45,6 +45,12 @@ function Tile({ e, label, caption, Icon, onChoose, focusFirst }: {
   );
 }
 
+const LAST_LABEL: Record<Energy, string> = {
+  good: 'Good',
+  okay: 'Okay',
+  low: 'Low',
+};
+
 export function CheckIn({ last, onChoose }: { last: Energy | null; onChoose: (e: Energy) => void }) {
   const now = new Date();
   const hour = now.getHours();
@@ -79,9 +85,18 @@ export function CheckIn({ last, onChoose }: { last: Energy | null; onChoose: (e:
           ))}
         </div>
         {last && (
-          <p className="mt-8 text-sm" style={{ color: 'var(--ink-soft)' }}>
-            Last time you checked in as {last}. Press Escape to keep it.
-          </p>
+          <div className="mt-8 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-soft h-12 px-5 text-sm"
+              onClick={() => onChoose(last)}
+            >
+              Same as last time: {LAST_LABEL[last]}
+            </button>
+            <p className="text-xs" style={{ color: 'var(--ink-soft)' }}>
+              or press Escape
+            </p>
+          </div>
         )}
       </div>
     </motion.div>

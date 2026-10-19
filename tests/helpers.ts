@@ -27,6 +27,9 @@ export async function chooseEnergy(page: Page, energy: 'good' | 'okay' | 'low') 
   if (await tile.count()) await tile.click();
   // The radio is visually hidden inside its label, so skip the hit-target wait.
   else await page.getByRole('radio', { name }).check({ force: true });
+  // Views cross-fade; wait until the old one has left so locators see only the new view.
+  await expect(page.locator('section[data-view]')).toHaveCount(1);
+  await expect(page.locator(`section[data-view="${energy}"]`)).toBeVisible();
 }
 
 // Wait until entrance fades finish, so axe measures settled colours, not mid-animation ones.

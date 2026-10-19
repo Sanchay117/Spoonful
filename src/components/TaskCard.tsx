@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { CalendarDays, Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { Effort, Task } from '../state/tasks';
-import { effortLabel } from '../state/tasks';
+import { dueLabel, effortLabel } from '../state/tasks';
 import { useGentle } from './gentle';
 import { EffortPill } from './bits';
 
@@ -24,16 +24,18 @@ function Bloom() {
 function TaskForm({ initial, submitLabel, onSubmit, onCancel }: {
   initial?: Task;
   submitLabel: string;
-  onSubmit: (title: string, effort: Effort) => void;
+  onSubmit: (title: string, effort: Effort, dueDate?: string) => void;
   onCancel: () => void;
 }) {
   const [title, setTitle] = useState(initial?.title ?? '');
   const [effort, setEffort] = useState<Effort>(initial?.effort ?? 'light');
+  const [due, setDue] = useState(initial?.dueDate ?? '');
   const submit = () => {
     const t = title.trim();
     if (!t) return;
-    onSubmit(t, effort);
+    onSubmit(t, effort, due || undefined);
   };
+  const dueId = initial ? `due-${initial.id}` : 'due-new';
   return (
     <div className="flex flex-col gap-3 p-4">
       <label htmlFor={initial ? `edit-${initial.id}` : 'new-task-title'} className="sr-only">
@@ -49,14 +51,37 @@ function TaskForm({ initial, submitLabel, onSubmit, onCancel }: {
         }}
         placeholder="Something gentle…"
         autoFocus
-        className="w-full bg-transparent text-base outline-none"
+        className="min-h-12 w-full bg-transparent text-base outline-none"
         style={{ color: 'var(--ink)' }}
       />
+      <div className="flex flex-wrap items-center gap-3">
+        <label htmlFor={dueId} className="text-xs font-medium" style={{ color: 'var(--ink-soft)' }}>
+          Due date (optional)
+        </label>
+        <input
+          id={dueId}
+          type="date"
+          value={due}
+          onChange={(e) => setDue(e.target.value)}
+          className="glass min-h-12 rounded-xl px-3 text-sm outline-none"
+          style={{ color: 'var(--ink)' }}
+        />
+        {due && (
+          <button
+            type="button"
+            className="inline-flex min-h-12 items-center px-2 text-xs font-medium underline-offset-4 hover:underline"
+            style={{ color: 'var(--ink-soft)' }}
+            onClick={() => setDue('')}
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <fieldset className="flex items-center gap-1.5">
           <legend className="sr-only">How much effort is it?</legend>
           {(['light', 'medium', 'heavy'] as Effort[]).map((e) => (
-            <label key={e} className="cursor-pointer">
+            <label key={e} className="inline-flex min-h-12 cursor-pointer items-center">
               <input
                 type="radio"
                 name={initial ? `effort-${initial.id}` : 'effort-new'}
@@ -87,23 +112,13 @@ function TaskForm({ initial, submitLabel, onSubmit, onCancel }: {
   );
 }
 
-export function Composer({ onAdd, onClose }: {
-  onAdd: (title: string, effort: Effort) => void;
-  onClose: () => void;
-}) {
-  return (
-    <motion.div layout className="glass rounded-2xl" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={spring}>
-      <TaskForm submitLabel="Add" onSubmit={onAdd} onCancel={onClose} />
-    </motion.div>
-  );
-}
-
-export function TaskCard({ task, index, onDone, onEdit, onRemove }: {
+export function TaskCard({ task, index, onDone, onEdit, onRemove, onRetag }: {
   task: Task;
   index: number;
   onDone: (id: string) => void;
   onEdit: (id: string, patch: Partial<Task>) => void;
   onRemove: (id: string) => void;
+  onRetag: (id: string) => void;
 }) {
   const gentle = useGentle();
   const [editing, setEditing] = useState(false);
@@ -133,8 +148,8 @@ export function TaskCard({ task, index, onDone, onEdit, onRemove }: {
         <TaskForm
           initial={task}
           submitLabel="Save"
-          onSubmit={(title, effort) => {
-            onEdit(task.id, { title, effort });
+          onSubmit={(title, effort, due) => {
+            onEdit(task.id, { title, effort, dueDate: due || undefined });
             setEditing(false);
           }}
           onCancel={() => setEditing(false)}
@@ -169,7 +184,23 @@ export function TaskCard({ task, index, onDone, onEdit, onRemove }: {
           <Check className="h-5 w-5" aria-hidden="true" />
         </button>
         <p className="min-w-0 flex-1 truncate px-1 text-[15px] sm:text-base">{task.title}</p>
-        <EffortPill effort={task.effort} />
+        {task.dueDate && (
+          <span
+            className="hidden shrink-0 items-center gap-1 text-xs sm:inline-flex"
+            style={{ color: 'var(--ink-soft)' }}
+          >
+            <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+            {dueLabel(task.dueDate)}
+          </span>
+        )}
+        <button
+          type="button"
+          className="inline-flex min-h-12 shrink-0 items-center rounded-full bg-transparent px-1"
+          onClick={() => onRetag(task.id)}
+        >
+          <EffortPill effort={task.effort} />
+          <span className="sr-only"> effort for “{task.title}”, tap to change</span>
+        </button>
         <div className="flex shrink-0 opacity-100 transition-opacity duration-200 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
           <button type="button" className="icon-btn" aria-label={`Edit “${task.title}”`} onClick={() => setEditing(true)}>
             <Pencil className="h-5 w-5" aria-hidden="true" />

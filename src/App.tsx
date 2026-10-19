@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, useReducedMotion } from 'framer-motion';
 import type { Effort, Energy, Task } from './state/tasks';
-import { okaySplit, pickForLow, sortedToday, todayStr, tomorrowStr, uid } from './state/tasks';
+import {
+  dueSoon,
+  effortLabel,
+  goodSplit,
+  heavierEffort,
+  nextEffort,
+  okaySplit,
+  pickForLow,
+  sortedToday,
+  todayStr,
+  tomorrowStr,
+  uid,
+} from './state/tasks';
 import { loadEnergy, loadSettings, loadTasks, saveEnergy, saveSettings, saveTasks } from './state/storage';
 import { makeDemoTasks } from './state/demo';
 import { Aura } from './components/Aura';
@@ -10,10 +22,11 @@ import { CheckIn } from './components/CheckIn';
 import { ListView } from './components/ListView';
 import { LowView } from './components/LowView';
 import { CompareView } from './components/CompareView';
+import { ReminderDialog } from './components/ReminderDialog';
 import { GentleContext } from './components/gentle';
 
 const VIEW_MSG: Record<Energy, string> = {
-  good: 'Good energy. Showing your full list, gentlest first.',
+  good: 'Good energy. Showing up to five tasks, gentlest first.',
   okay: 'Okay energy. Showing three tasks. The rest are resting.',
   low: 'Low energy. One thing at a time.',
 };
@@ -22,7 +35,7 @@ const tap = () => {
   try {
     navigator.vibrate?.(10);
   } catch {
-    // haptics unavailable — nothing to do
+    // haptics unavailable
   }
 };
 
@@ -33,6 +46,7 @@ export default function App() {
   const [calm, setCalm] = useState(() => loadSettings().calm);
   const [checkinOpen, setCheckinOpen] = useState(true);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [liveMsg, setLiveMsg] = useState('');
   const prefersReduced = useReducedMotion();
@@ -89,17 +103,69 @@ export default function App() {
   );
 
   const addTask = useCallback(
-    (title: string, effort: Effort) => {
+    (title: string, effort: Effort = 'medium') => {
       const task: Task = { id: uid(), title, effort, createdAt: Date.now(), scheduledFor: todayStr() };
-      setTasks((ts) => [...ts, task]);
-      announce(`Added “${title}”.`);
+      const nextTasks = [...tasks, task];
+      setTasks(nextTasks);
+      announce(`Added “${title}” as Medium.`);
+      if (energy === 'okay' && !okaySplit(nextTasks).shown.some((t) => t.id === task.id)) {
+        showNote('Added. It’s resting for now, hidden, not deleted.');
+      } else if (energy === 'low') {
+        showNote('Added for a better day.');
+      }
     },
-    [announce]
+    [tasks, energy, announce, showNote]
   );
 
   const updateTask = useCallback((id: string, patch: Partial<Task>) => {
-    setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    setTasks((ts) =>
+      ts.map((t) => {
+        if (t.id !== id) return t;
+        const next: Task = { ...t, ...patch };
+        if (!next.dueDate) {
+          delete next.dueDate;
+        }
+        return next;
+      })
+    );
   }, []);
+
+  const retag = useCallback(
+    (id: string) => {
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return;
+      const next = nextEffort(task.effort);
+      const nextTasks = tasks.map((t) => (t.id === id ? { ...t, effort: next } : t));
+      setTasks(nextTasks);
+      announce(`“${task.title}” is now ${effortLabel[next]}.`);
+      if (
+        energy === 'okay' &&
+        okaySplit(tasks).shown.some((t) => t.id === id) &&
+        !okaySplit(nextTasks).shown.some((t) => t.id === id)
+      ) {
+        showNote(`“${task.title}” is ${effortLabel[next]} now, so it’s resting today.`);
+      }
+    },
+    [tasks, energy, announce, showNote]
+  );
+
+  const onHarder = useCallback(
+    (id: string) => {
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return;
+      const next = heavierEffort(task.effort);
+      const label = effortLabel[next];
+      const nextTasks = tasks.map((t) => (t.id === id ? { ...t, effort: next } : t));
+      setTasks(nextTasks);
+      const msg =
+        pickForLow(nextTasks) !== null
+          ? `Moved to ${label}. Here’s something lighter.`
+          : `Moved to ${label}. Nothing else is light, so rest counts today.`;
+      showNote(msg);
+      announce(msg);
+    },
+    [tasks, announce, showNote]
+  );
 
   const removeTask = useCallback(
     (id: string) => {
@@ -109,13 +175,10 @@ export default function App() {
     [announce]
   );
 
-  const completeTask = useCallback(
-    (id: string) => {
-      tap();
-      setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, completedAt: Date.now() } : t)));
-    },
-    []
-  );
+  const completeTask = useCallback((id: string) => {
+    tap();
+    setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, completedAt: Date.now() } : t)));
+  }, []);
 
   const notToday = useCallback(
     (id: string) => {
@@ -135,6 +198,7 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (document.querySelector('dialog[open]')) return;
       const el = e.target as HTMLElement | null;
       const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
       if (e.key === 'Escape') {
@@ -154,8 +218,14 @@ export default function App() {
   }, [compareOpen, checkinOpen, choose, energy, announce]);
 
   const good = useMemo(() => sortedToday(tasks), [tasks]);
+  const { shown: goodShown, more: goodMore } = useMemo(() => goodSplit(tasks), [tasks]);
   const { shown, resting } = useMemo(() => okaySplit(tasks), [tasks]);
   const lowTask = useMemo(() => pickForLow(tasks), [tasks]);
+  const upcoming = useMemo(() => {
+    if (energy === 'okay') return dueSoon(tasks, shown);
+    if (energy === 'good') return dueSoon(tasks, goodShown);
+    return dueSoon(tasks, lowTask ? [lowTask] : []);
+  }, [energy, tasks, shown, goodShown, lowTask]);
 
   return (
     <div className="relative h-dvh overflow-hidden">
@@ -178,6 +248,7 @@ export default function App() {
               }}
               onDemo={loadDemo}
               onCompare={() => setCompareOpen(true)}
+              onReminder={() => setReminderOpen(true)}
             />
           </div>
 
@@ -185,28 +256,46 @@ export default function App() {
             <div data-shell className="absolute inset-0">
               <AnimatePresence initial={false}>
                 {energy === 'low' ? (
-                  <LowView key="low" task={lowTask} note={note} onDone={completeTask} onNotToday={notToday} />
+                  <LowView
+                    key="low"
+                    task={lowTask}
+                    upcoming={upcoming}
+                    note={note}
+                    onDone={completeTask}
+                    onNotToday={notToday}
+                    onHarder={onHarder}
+                    onAdd={addTask}
+                    onAnnounce={announce}
+                  />
                 ) : energy === 'okay' ? (
                   <ListView
                     key="okay"
                     mode="okay"
                     tasks={shown}
+                    more={[]}
                     resting={resting}
+                    upcoming={upcoming}
+                    note={note}
                     onAdd={addTask}
                     onEdit={updateTask}
                     onRemove={removeTask}
                     onDone={completeTask}
+                    onRetag={retag}
                   />
                 ) : (
                   <ListView
                     key="good"
                     mode="good"
-                    tasks={good}
+                    tasks={goodShown}
+                    more={goodMore}
                     resting={[]}
+                    upcoming={upcoming}
+                    note={note}
                     onAdd={addTask}
                     onEdit={updateTask}
                     onRemove={removeTask}
                     onDone={completeTask}
+                    onRetag={retag}
                   />
                 )}
               </AnimatePresence>
@@ -229,6 +318,12 @@ export default function App() {
                 />
               )}
             </AnimatePresence>
+
+            <ReminderDialog
+              open={reminderOpen}
+              onClose={() => setReminderOpen(false)}
+              onAnnounce={announce}
+            />
           </main>
 
           <div data-shell>

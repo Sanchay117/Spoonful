@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import type { Effort, Task } from '../state/tasks';
 import { useGentle } from './gentle';
 import { EffortPill, EmptyState } from './bits';
-import { Composer, TaskCard } from './TaskCard';
+import { QuickAdd } from './QuickAdd';
+import { TaskCard } from './TaskCard';
+import { ComingUp } from './ComingUp';
 
 function RestNote({ resting }: { resting: Task[] }) {
   const [open, setOpen] = useState(false);
@@ -59,18 +61,42 @@ function RestNote({ resting }: { resting: Task[] }) {
   );
 }
 
-export function ListView({ mode, tasks, resting, onAdd, onEdit, onRemove, onDone }: {
+export function ListView({
+  mode,
+  tasks,
+  more,
+  resting,
+  upcoming,
+  note,
+  onAdd,
+  onEdit,
+  onRemove,
+  onDone,
+  onRetag,
+}: {
   mode: 'good' | 'okay';
   tasks: Task[];
+  more: Task[];
   resting: Task[];
+  upcoming: Task[];
+  note: string | null;
   onAdd: (title: string, effort: Effort) => void;
   onEdit: (id: string, patch: Partial<Task>) => void;
   onRemove: (id: string) => void;
   onDone: (id: string) => void;
+  onRetag: (id: string) => void;
 }) {
   const gentle = useGentle();
-  const [composerOpen, setComposerOpen] = useState(false);
-  const heading = mode === 'good' ? 'Here’s everything, gentlest first.' : 'Three things is plenty today.';
+  const [showAll, setShowAll] = useState(false);
+
+  const heading =
+    mode === 'good'
+      ? more.length > 0
+        ? 'Five to start. Gentlest first.'
+        : 'Here’s everything, gentlest first.'
+      : 'Three things is plenty today.';
+
+  const visibleTasks = mode === 'good' && showAll ? [...tasks, ...more] : tasks;
 
   return (
     <motion.section
@@ -82,36 +108,63 @@ export function ListView({ mode, tasks, resting, onAdd, onEdit, onRemove, onDone
     >
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-3 px-5 pb-24 pt-3 sm:px-8">
         <h2 className="font-display text-2xl sm:text-[32px]">{heading}</h2>
-        {composerOpen ? (
-          <Composer
-            onAdd={(t, e) => {
-              onAdd(t, e);
-              setComposerOpen(false);
-            }}
-            onClose={() => setComposerOpen(false)}
-          />
-        ) : (
-          <button
-            type="button"
-            className="btn btn-soft w-full gap-2 rounded-2xl border-dashed text-base"
-            onClick={() => setComposerOpen(true)}
-          >
-            <Plus className="h-5 w-5" aria-hidden="true" />
-            Add a task
-          </button>
-        )}
-        {tasks.length === 0 ? (
+        <QuickAdd onAdd={onAdd} />
+        <p className="px-1 text-xs" style={{ color: 'var(--ink-soft)' }}>
+          New tasks start as Medium. Tap the pill to change it.
+        </p>
+        <AnimatePresence>
+          {note && (
+            <motion.p
+              key={note}
+              initial={{ opacity: 0, y: gentle ? 0 : 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: gentle ? 0.25 : 0.35, ease: 'easeOut' }}
+              className="px-1 text-xs"
+              style={{ color: 'var(--ink-soft)' }}
+            >
+              {note}
+            </motion.p>
+          )}
+        </AnimatePresence>
+        {visibleTasks.length === 0 ? (
           <EmptyState />
         ) : (
           <ul data-testid="task-list" className="flex flex-col gap-3">
             <AnimatePresence initial={false} mode="popLayout">
-              {tasks.map((t, i) => (
-                <TaskCard key={t.id} task={t} index={i} onDone={onDone} onEdit={onEdit} onRemove={onRemove} />
+              {visibleTasks.map((t, i) => (
+                <TaskCard
+                  key={t.id}
+                  task={t}
+                  index={i}
+                  onDone={onDone}
+                  onEdit={onEdit}
+                  onRemove={onRemove}
+                  onRetag={onRetag}
+                />
               ))}
             </AnimatePresence>
           </ul>
         )}
+        {mode === 'good' && more.length > 0 && (
+          <div className="mt-1 text-center">
+            <button
+              type="button"
+              className="inline-flex min-h-12 items-center gap-1 text-sm font-medium underline-offset-4 hover:underline"
+              style={{ color: 'var(--ink)' }}
+              aria-expanded={showAll}
+              onClick={() => setShowAll((v) => !v)}
+            >
+              {showAll ? 'Show just five' : `${more.length} more, whenever you want`}
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-300 ${showAll ? 'rotate-180' : ''}`}
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        )}
         {mode === 'okay' && <RestNote resting={resting} />}
+        {!(mode === 'good' && showAll) && <ComingUp tasks={upcoming} />}
       </div>
     </motion.section>
   );

@@ -1,5 +1,5 @@
 import type { Effort, Task } from './tasks';
-import { todayStr } from './tasks';
+import { dayStr, todayStr } from './tasks';
 
 const DEMO: [string, Effort][] = [
   ['Take morning meds with breakfast', 'light'],
@@ -24,11 +24,21 @@ const DEMO: [string, Effort][] = [
   ['Deep-clean the kitchen', 'heavy'],
 ];
 
+const DUE_OFFSETS: Record<string, number> = {
+  'Pay the wifi bill': 0,
+  'Submit the housing form': 1,
+  'Stats problem set, questions 1–6': 2,
+};
+
 export const makeDemoTasks = (): Task[] =>
-  DEMO.map(([title, effort], i) => ({
-    id: `demo-${i + 1}`,
-    title,
-    effort,
-    createdAt: Date.now() - (DEMO.length - i) * 60_000,
-    scheduledFor: todayStr(),
-  }));
+  DEMO.map(([title, effort], i) => {
+    const dueOffset = DUE_OFFSETS[title];
+    return {
+      id: `demo-${i + 1}`,
+      title,
+      effort,
+      createdAt: Date.now() - (DEMO.length - i) * 60_000,
+      scheduledFor: todayStr(),
+      ...(dueOffset !== undefined ? { dueDate: dayStr(dueOffset) } : {}),
+    };
+  });

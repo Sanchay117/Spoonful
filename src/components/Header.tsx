@@ -1,4 +1,4 @@
-import { Moon, Sparkles, Sun, SunMoon, Waves } from 'lucide-react';
+import { Bell, Moon, Sparkles, Sun, SunMoon, Waves } from 'lucide-react';
 import type { Energy } from '../state/tasks';
 import { SpoonMark } from './bits';
 
@@ -41,6 +41,7 @@ export function Header({
   onCalm,
   onDemo,
   onCompare,
+  onReminder,
 }: {
   energy: Energy;
   onEnergy: (e: Energy) => void;
@@ -48,6 +49,7 @@ export function Header({
   onCalm: () => void;
   onDemo: () => void;
   onCompare: () => void;
+  onReminder: () => void;
 }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-5 pb-3 pt-5 sm:px-8">
@@ -70,7 +72,21 @@ export function Header({
           <Waves className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Calm</span>
         </button>
-        <button type="button" className="btn btn-soft h-12 gap-2 px-4 text-sm" onClick={onDemo}>
+        <button
+          type="button"
+          className="btn btn-soft h-12 gap-2 px-4 text-sm"
+          aria-label="Daily reminder"
+          onClick={onReminder}
+        >
+          <Bell className="h-4 w-4" aria-hidden="true" />
+          <span className="hidden sm:inline">Reminder</span>
+        </button>
+        <button
+          type="button"
+          className="btn btn-soft h-12 gap-2 px-4 text-sm"
+          aria-label="Demo day"
+          onClick={onDemo}
+        >
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Demo day</span>
         </button>
