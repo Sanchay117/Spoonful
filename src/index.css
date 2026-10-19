@@ -320,6 +320,12 @@
   opacity: 0;
 }
 
+/* <main> only takes focus programmatically (after the check-in closes) so the next Tab starts
+   in the list; it is not a control, so it needs no ring. */
+main[tabindex='-1']:focus {
+  outline: none;
+}
+
 /* Visually hidden radios (energy switch, effort pills): show their focus on the visible label. */
 label:has(> input.sr-only:focus-visible) > span {
   outline: 2px solid var(--focus);
