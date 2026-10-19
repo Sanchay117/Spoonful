@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Moon, Mountain, Sunrise, Timer } from 'lucide-react';
 import type { Effort, Task } from '../state/tasks';
@@ -9,19 +9,19 @@ import { QuickAdd } from './QuickAdd';
 
 const spring = { type: 'spring', stiffness: 170, damping: 24 } as const;
 
-function FocusCard({
-  task,
-  onDone,
-  onNotToday,
-  onHarder,
-  onAnnounce,
-}: {
+type FocusCardProps = {
   task: Task;
   onDone: (id: string) => void;
   onNotToday: (id: string) => void;
   onHarder: (id: string) => void;
   onAnnounce: (msg: string) => void;
-}) {
+};
+
+// forwardRef so AnimatePresence's popLayout can measure the card as it leaves.
+const FocusCard = forwardRef<HTMLDivElement, FocusCardProps>(function FocusCard(
+  { task, onDone, onNotToday, onHarder, onAnnounce },
+  ref
+) {
   const gentle = useGentle();
   const [leaving, setLeaving] = useState<null | 'done' | 'notToday'>(null);
   const [bloom, setBloom] = useState(false);
@@ -70,13 +70,16 @@ function FocusCard({
 
   return (
     <motion.div
+      ref={ref}
       data-task-card
+      // once leaving, the card is gone for clicks, keys and screen readers while it animates out
+      {...(leaving ? { inert: '', 'aria-hidden': true } : {})}
       layoutId={`task-${task.id}`}
       exit={exit}
       initial={{ opacity: 0, scale: gentle ? 1 : 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={gentle ? { duration: 0.3 } : spring}
-      className="glass glow-card relative mt-4 overflow-hidden rounded-[2rem] px-7 py-10 text-center sm:px-12 sm:py-14"
+      className="glass glow-card relative overflow-hidden rounded-[2rem] px-7 py-10 text-center sm:px-12 sm:py-14"
     >
       {bloom && (
         <motion.span
@@ -216,7 +219,7 @@ function FocusCard({
       </AnimatePresence>
     </motion.div>
   );
-}
+});
 
 function RestScreen() {
   const gentle = useGentle();
@@ -268,26 +271,30 @@ export function LowView({
       exit={{ opacity: 0, transition: { duration: gentle ? 0.25 : 0.6, ease: 'easeInOut' } }}
     >
       <div className="flex min-h-full items-center justify-center p-6">
-        <div className="w-full max-w-xl">
+        <div className="relative w-full max-w-xl">
           <p className="text-center text-[11px] font-semibold uppercase tracking-[0.22em]" style={{ color: 'var(--ink-soft)' }}>
             Today’s one thing
           </p>
-          <AnimatePresence mode="wait" initial={false}>
-            {task ? (
-              <FocusCard
-                key={task.id}
-                task={task}
-                onDone={onDone}
-                onNotToday={onNotToday}
-                onHarder={onHarder}
-                onAnnounce={onAnnounce}
-              />
-            ) : (
-              <div key="rest" className="mt-4 flex justify-center">
-                <RestScreen />
-              </div>
-            )}
-          </AnimatePresence>
+          {/* popLayout, not wait: the next card mounts at once while the old one leaves, so a
+              stalled exit animation can never leave the screen blank. */}
+          <div className="mt-4">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {task ? (
+                <FocusCard
+                  key={task.id}
+                  task={task}
+                  onDone={onDone}
+                  onNotToday={onNotToday}
+                  onHarder={onHarder}
+                  onAnnounce={onAnnounce}
+                />
+              ) : (
+                <div key="rest" className="flex justify-center">
+                  <RestScreen />
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
           <AnimatePresence>{note && <GentleNote key={note}>{note}</GentleNote>}</AnimatePresence>
           {task && (
             <p className="mt-8 text-center text-xs" style={{ color: 'var(--ink-soft)' }}>
