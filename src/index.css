@@ -311,3 +311,17 @@
     var(--glass-shadow),
     0 0 90px var(--glow);
 }
+
+/* While the check-in or compare view is open, the app behind it rests out of sight. */
+[data-shell] {
+  transition: opacity 0.45s ease;
+}
+[data-shell][inert] {
+  opacity: 0;
+}
+
+/* Visually hidden radios (energy switch, effort pills): show their focus on the visible label. */
+label:has(> input.sr-only:focus-visible) > span {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
