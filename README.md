@@ -2,6 +2,8 @@
 
 **A to-do list that shrinks to fit how much energy you have today.**
 
+**Try it:** https://cosmic-daffodil-da1757.netlify.app/ · **Demo video:** https://youtu.be/c5m3yciV5e0
+
 Built for [Taskforge](https://taskforge.devpost.com/), a student hackathon about accessible tools that help people focus, organize, and get more done.
 
 ## The problem
